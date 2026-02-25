@@ -187,12 +187,9 @@ body {
 /* ===================== */
 .app-container {
   width: 100%;
-  max-width: 1100px;
-  height: 92vh;
-  margin: 0 auto;
+  height: 100vh;
   display: flex;
   overflow: hidden;
-  border-radius: 1rem;
 }
 
 /* === Sidebar === */

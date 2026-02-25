@@ -11,7 +11,7 @@ const ChatApp: React.FC = () => {
     };
 
     return (
-        <div className="app-container glass-panel">
+        <div className="app-container">
             <Sidebar
                 onSelectChat={setActiveChatId}
                 activeChatId={activeChatId}

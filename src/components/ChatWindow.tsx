@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { socketService } from '../services/socket';
-import { Send, ArrowLeft, Heart, Smile, Lock, Users } from 'lucide-react';
+import { Send, ArrowLeft, Heart, Smile, Lock, Users, Bell } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
 interface ChatWindowProps {
@@ -22,6 +22,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
     const [enteredPassKey, setEnteredPassKey] = useState('');
     const [passKeyInput, setPassKeyInput] = useState('');
     const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+    const [notifying, setNotifying] = useState(false);
     const typingTimeoutRef = useRef<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -152,6 +153,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const handleNotify = async () => {
+        if (!chatId || notifying) return;
+        setNotifying(true);
+        try {
+            await api.post(`/chats/${chatId}/notify`, {
+                frontUrl: window.location.origin
+            });
+            alert('Notification email sent to participant!');
+        } catch (error) {
+            console.error('Failed to send notification', error);
+            alert('Failed to send notification email. Make sure SMTP is configured on backend.');
+        } finally {
+            setNotifying(false);
+        }
+    };
+
     const UserAvatar = ({ avatar, name }: { avatar?: string; name: string }) => {
         if (avatar) {
             return <div className="avatar" style={{ fontSize: '1.5rem', background: 'transparent' }}>{avatar}</div>;
@@ -254,6 +271,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                         title="Set Pass Key"
                     >
                         <Lock size={16} />
+                    </button>
+                    <button
+                        onClick={handleNotify}
+                        className="icon-btn"
+                        title="Notify Participant via Email"
+                        disabled={notifying}
+                    >
+                        <Bell size={16} className={notifying ? 'animate-pulse' : ''} />
                     </button>
                 </div>
             </div>
