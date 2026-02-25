@@ -20,7 +20,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [enteredPassKey, setEnteredPassKey] = useState('');
-    const [passKeyInput, setPassKeyInput] = useState('');
     const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
     const [notifying, setNotifying] = useState(false);
 
@@ -43,7 +42,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
         if (chatId) {
             setEnteredPassKey('');
             setIsLocked(false);
-            setPassKeyInput('');
             setIsOtherUserTyping(false);
             fetchMessages('');
             socketService.joinChat(chatId);
@@ -371,6 +369,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                                 className={`message ${isSentByMe ? 'sent' : 'received'}`}
                                 onDoubleClick={() => handleLikeMessage(message.id)}
                             >
+                                <button
+                                    className={`message-like-btn ${isLiked ? 'liked' : ''}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleLikeMessage(message.id);
+                                    }}
+                                    title={isLiked ? "Unlike" : "Like"}
+                                >
+                                    <Heart size={14} fill={isLiked ? "#ef4444" : "none"} />
+                                </button>
                                 {message.content.startsWith('U2FsdGVkX1') ? <i>Encrypted Message</i> : message.content}
                                 <div className="message-meta">
                                     <span className="message-time">

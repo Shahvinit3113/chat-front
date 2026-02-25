@@ -641,3 +641,66 @@ body {
     transform: scale(1);
   }
 }
+
+/* === Message Actions & Likes === */
+.message {
+  position: relative;
+}
+
+.message-like-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.message:hover .message-like-btn {
+  opacity: 1;
+  top: -12px;
+}
+
+.sent .message-like-btn {
+  right: auto;
+  left: -10px;
+}
+
+.sent:hover .message-like-btn {
+  left: -12px;
+}
+
+.message-like-btn:hover {
+  transform: scale(1.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.message-like-btn.liked {
+  opacity: 1;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+.like-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
