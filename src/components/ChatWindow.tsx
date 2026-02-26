@@ -2,16 +2,17 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { socketService } from '../services/socket';
-import { Send, ArrowLeft, Heart, Smile, Lock, Users, Bell } from 'lucide-react';
+import { Send, ArrowLeft, Heart, Smile, Lock, Users, Bell, Reply, X, MessageSquare } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
 interface ChatWindowProps {
     chatId: string;
     onBack?: () => void;
     onShowUsers?: () => void;
+    onlineUserIds: Set<string>;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers, onlineUserIds }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
@@ -22,6 +23,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
     const [enteredPassKey, setEnteredPassKey] = useState('');
     const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
     const [notifying, setNotifying] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<any>(null);
 
     // PIN Modal State
     const [showPinModal, setShowPinModal] = useState(false);
@@ -43,6 +45,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
             setEnteredPassKey('');
             setIsLocked(false);
             setIsOtherUserTyping(false);
+            setReplyingTo(null);
             fetchMessages('');
             socketService.joinChat(chatId);
 
@@ -52,6 +55,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                     if (prev.some(m => m.id === message.id)) return prev;
                     return [...prev, message];
                 });
+                // If I am the receiver and looking at the chat, mark it as read
+                if (message.senderId !== user?.id) {
+                    socketService.markAsRead(chatId);
+                }
             };
 
             const handleMessageLiked = (updatedMessage: any) => {
@@ -68,17 +75,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                 if (data.chatId === chatId) setIsOtherUserTyping(false);
             };
 
+            const handleMessagesRead = (data: any) => {
+                if (data.chatId === chatId) {
+                    setMessages((prev) =>
+                        prev.map((m) => (m.senderId !== data.readerId ? { ...m, isRead: true } : m))
+                    );
+                }
+            };
+
             socketService.onNewMessage(handleNewMessage);
             socketService.socket?.on('messageLiked', handleMessageLiked);
             socketService.onUserTyping(handleUserTyping);
             socketService.onUserStopTyping(handleUserStopTyping);
+            socketService.onMessagesRead(handleMessagesRead);
 
             fetchChatDetails();
+            socketService.markAsRead(chatId);
 
             return () => {
-                socketService.offNewMessage();
+                socketService.offNewMessage(handleNewMessage);
                 socketService.socket?.off('messageLiked', handleMessageLiked);
-                socketService.offTypingEvents();
+                socketService.offTypingEvents(handleUserTyping, handleUserStopTyping);
+                socketService.offMessagesRead(handleMessagesRead);
             };
         }
     }, [chatId]);
@@ -146,8 +164,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
             clearTimeout(typingTimeoutRef.current);
             socketService.sendStopTyping(chatId);
         }
-        socketService.sendMessage(chatId, newMessage.trim());
+        socketService.sendMessage(chatId, newMessage.trim(), replyingTo?.id);
         setNewMessage('');
+        setReplyingTo(null);
         setShowEmojiPicker(false);
     };
 
@@ -226,13 +245,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
 
     if (!chatId) {
         return (
-            <div className="chat-area" style={{ justifyContent: 'center', alignItems: 'center' }}>
-                <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', opacity: 0.15 }}>
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <div className="chat-area empty-chat-area">
+                <div className="premium-empty-state">
+                    <div className="empty-state-icon-wrapper">
+                        <MessageSquare size={48} strokeWidth={1.5} />
+                        <div className="floating-sparkle s1">✨</div>
+                        <div className="floating-sparkle s2">✨</div>
                     </div>
-                    <h3 style={{ fontWeight: 500, marginBottom: '0.5rem' }}>Select a conversation</h3>
-                    <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>Choose a chat or start a new one</p>
+                    <h2 className="empty-state-title">Select a conversation</h2>
+                    <p className="empty-state-subtitle">Choose a chat or start a new one to begin messaging</p>
+                    <div className="empty-state-decoration"></div>
                 </div>
             </div>
         );
@@ -317,13 +339,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                 )}
                 <UserAvatar avatar={otherUser?.avatar} name={otherUser?.name || '?'} />
                 <div style={{ flex: 1 }}>
-                    <h3 className="chat-header-name">{otherUser?.name || 'Chat'}</h3>
-                    {isOtherUserTyping && (
-                        <span className="typing-status">
-                            <span className="typing-dots"><span></span><span></span><span></span></span>
-                            typing...
-                        </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <h3 className="chat-header-name">{otherUser?.name || 'Chat'}</h3>
+                        {otherUser && onlineUserIds.has(otherUser.id) && (
+                            <span className="live-status-dot" title="Online" />
+                        )}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                     {onShowUsers && (
@@ -369,27 +390,55 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
                                 className={`message ${isSentByMe ? 'sent' : 'received'}`}
                                 onDoubleClick={() => handleLikeMessage(message.id)}
                             >
-                                <button
-                                    className={`message-like-btn ${isLiked ? 'liked' : ''}`}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleLikeMessage(message.id);
-                                    }}
-                                    title={isLiked ? "Unlike" : "Like"}
-                                >
-                                    <Heart size={14} fill={isLiked ? "#ef4444" : "none"} />
-                                </button>
-                                {message.content.startsWith('U2FsdGVkX1') ? <i>Encrypted Message</i> : message.content}
-                                <div className="message-meta">
-                                    <span className="message-time">
-                                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                    {message.likedByIds && message.likedByIds.length > 0 && (
-                                        <span className={`like-badge ${isLiked ? 'heart-bounce' : ''}`}>
-                                            <Heart size={10} fill={isLiked ? "#ef4444" : "none"} color={isLiked ? "#ef4444" : "var(--text-secondary)"} />
-                                            <span style={{ color: isLiked ? "#ef4444" : "inherit" }}>{message.likedByIds.length}</span>
+                                <div className="message-actions-hover">
+                                    <button
+                                        className="message-like-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setReplyingTo(message);
+                                        }}
+                                        title="Reply"
+                                    >
+                                        <Reply size={14} />
+                                    </button>
+                                    <button
+                                        className={`message-like-btn ${isLiked ? 'liked' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleLikeMessage(message.id);
+                                        }}
+                                        title={isLiked ? "Unlike" : "Like"}
+                                    >
+                                        <Heart size={14} fill={isLiked ? "#ef4444" : "none"} />
+                                    </button>
+                                </div>
+                                {message.replyTo && (
+                                    <div className={`reply-reference ${isSentByMe ? 'sent' : 'received'}`}>
+                                        <span className="reply-sender">{message.replyTo.sender?.name || (message.replyTo.senderId === user?.id ? 'You' : otherUser?.name)}</span>
+                                        <p className="reply-text">{message.replyTo.content.startsWith('U2FsdGVkX1') ? 'Encrypted Message' : message.replyTo.content}</p>
+                                    </div>
+                                )}
+                                <div className="message-content">
+                                    {message.content.startsWith('U2FsdGVkX1') ? <i>Encrypted Message</i> : message.content}
+                                    <div className="message-meta">
+                                        <span className="message-time">
+                                            {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
-                                    )}
+                                        {message.likedByIds && message.likedByIds.length > 0 && (
+                                            <span className={`like-badge ${isLiked ? 'heart-bounce' : ''}`}>
+                                                <Heart size={10} fill={isLiked ? "#ef4444" : "none"} color={isLiked ? "#ef4444" : "var(--text-secondary)"} />
+                                                <span style={{ color: isLiked ? "#ef4444" : "inherit" }}>{message.likedByIds.length}</span>
+                                            </span>
+                                        )}
+                                        {isSentByMe && (
+                                            <span className={`read-status ${message.isRead ? 'read' : 'unread'}`} title={message.isRead ? `Seen at ${new Date(message.readAt).toLocaleTimeString()}` : 'Sent'}>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M7 12l3 3 7-7" />
+                                                    {message.isRead && <path d="M12 12l3 3 7-7" />}
+                                                </svg>
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -399,6 +448,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onShowUsers }) 
             </div>
 
             <div className="message-input-area" style={{ position: 'relative' }}>
+                {replyingTo && (
+                    <div className="reply-banner">
+                        <div className="reply-banner-content">
+                            <span className="reply-banner-title">
+                                Replying to {replyingTo.senderId === user?.id ? 'You' : (replyingTo.sender?.name || otherUser?.name)}
+                            </span>
+                            <p className="reply-banner-text">
+                                {replyingTo.content.startsWith('U2FsdGVkX1') ? 'Encrypted Message' : replyingTo.content}
+                            </p>
+                        </div>
+                        <button type="button" className="icon-btn" onClick={() => setReplyingTo(null)}>
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
+                {isOtherUserTyping && (
+                    <div className="typing-indicator-bottom">
+                        <span className="typing-dots"><span></span><span></span><span></span></span>
+                        {otherUser?.name} is typing...
+                    </div>
+                )}
                 {showEmojiPicker && (
                     <div ref={emojiPickerRef} style={{ position: 'absolute', bottom: '100%', right: '1rem', zIndex: 50, marginBottom: '0.5rem' }}>
                         <EmojiPicker onEmojiClick={handleEmojiClick} theme={'dark' as any} />

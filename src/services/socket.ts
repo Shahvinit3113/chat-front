@@ -38,16 +38,21 @@ class SocketService {
         this.socket?.emit('joinChat', { chatId });
     }
 
-    sendMessage(chatId: string, content: string) {
-        this.socket?.emit('sendMessage', { chatId, content });
+    sendMessage(chatId: string, content: string, replyToId?: string) {
+        this.socket?.emit('sendMessage', { chatId, content, replyToId });
     }
+
 
     onNewMessage(callback: (message: any) => void) {
         this.socket?.on('newMessage', callback);
     }
 
-    offNewMessage() {
-        this.socket?.off('newMessage');
+    offNewMessage(callback?: (message: any) => void) {
+        if (callback) {
+            this.socket?.off('newMessage', callback);
+        } else {
+            this.socket?.off('newMessage');
+        }
     }
 
     sendTyping(chatId: string) {
@@ -66,9 +71,25 @@ class SocketService {
         this.socket?.on('userStopTyping', callback);
     }
 
-    offTypingEvents() {
-        this.socket?.off('userTyping');
-        this.socket?.off('userStopTyping');
+    offTypingEvents(typingCb?: any, stopTypingCb?: any) {
+        if (typingCb) this.socket?.off('userTyping', typingCb);
+        else this.socket?.off('userTyping');
+
+        if (stopTypingCb) this.socket?.off('userStopTyping', stopTypingCb);
+        else this.socket?.off('userStopTyping');
+    }
+
+    markAsRead(chatId: string) {
+        this.socket?.emit('markAsRead', { chatId });
+    }
+
+    onMessagesRead(callback: (data: any) => void) {
+        this.socket?.on('messagesRead', callback);
+    }
+
+    offMessagesRead(callback?: (data: any) => void) {
+        if (callback) this.socket?.off('messagesRead', callback);
+        else this.socket?.off('messagesRead');
     }
 
     // Presence
@@ -84,10 +105,15 @@ class SocketService {
         this.socket?.on('userOffline', callback);
     }
 
-    offPresenceEvents() {
-        this.socket?.off('onlineUsers');
-        this.socket?.off('userOnline');
-        this.socket?.off('userOffline');
+    offPresenceEvents(onlineUsersCb?: any, userOnlineCb?: any, userOfflineCb?: any) {
+        if (onlineUsersCb) this.socket?.off('onlineUsers', onlineUsersCb);
+        else this.socket?.off('onlineUsers');
+
+        if (userOnlineCb) this.socket?.off('userOnline', userOnlineCb);
+        else this.socket?.off('userOnline');
+
+        if (userOfflineCb) this.socket?.off('userOffline', userOfflineCb);
+        else this.socket?.off('userOffline');
     }
 }
 

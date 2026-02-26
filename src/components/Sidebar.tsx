@@ -2,50 +2,28 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { socketService } from '../services/socket';
-import { MessageSquare, Users, LogOut, Lock } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { MessageSquare, Users, LogOut, Lock, Palette } from 'lucide-react';
 
 interface SidebarProps {
     onSelectChat: (chatId: string) => void;
     activeChatId: string | null;
     isMobileHidden?: boolean;
+    onlineUserIds: Set<string>;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onSelectChat, activeChatId, isMobileHidden }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onSelectChat, activeChatId, isMobileHidden, onlineUserIds }) => {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState<'chats' | 'users'>('chats');
     const [chats, setChats] = useState<any[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
     const [openedChats, setOpenedChats] = useState<Set<string>>(new Set());
-    const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-
     useEffect(() => {
         fetchData();
     }, [activeTab]);
-
-    // Presence tracking
-    useEffect(() => {
-        socketService.onOnlineUsers((userIds) => {
-            setOnlineUserIds(new Set(userIds));
-        });
-
-        socketService.onUserOnline(({ userId }) => {
-            setOnlineUserIds(prev => new Set(prev).add(userId));
-        });
-
-        socketService.onUserOffline(({ userId }) => {
-            setOnlineUserIds(prev => {
-                const next = new Set(prev);
-                next.delete(userId);
-                return next;
-            });
-        });
-
-        return () => {
-            socketService.offPresenceEvents();
-        };
-    }, []);
 
     // Unread count tracking
     useEffect(() => {
@@ -64,8 +42,20 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectChat, activeChatId, isMobileH
             }
         };
 
+        const handleMessagesRead = (data: any) => {
+            setUnreadCounts(prev => {
+                const next = { ...prev };
+                delete next[data.chatId];
+                return next;
+            });
+        };
+
         socketService.onNewMessage(handleIncomingMessage);
-        return () => { };
+        socketService.onMessagesRead(handleMessagesRead);
+        return () => {
+            socketService.offNewMessage(handleIncomingMessage);
+            socketService.offMessagesRead(handleMessagesRead);
+        };
     }, [activeChatId, openedChats]);
 
     useEffect(() => {
@@ -125,14 +115,27 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectChat, activeChatId, isMobileH
             <div className="sidebar-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <UserAvatar avatar={(user as any)?.avatar} name={user?.name || ''} />
-                    <div>
-                        <h2 style={{ fontSize: '1rem', fontWeight: 600 }}>{user?.name}</h2>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)' }}>● Online</span>
+                    <div className="user-profile-info">
+                        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{user?.name}</h2>
+                        <span className="user-status-tag">
+                            <span className="status-pulse"></span>
+                            Connected
+                        </span>
                     </div>
                 </div>
-                <button onClick={logout} className="icon-btn" title="Logout">
-                    <LogOut size={18} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <button
+                        onClick={toggleTheme}
+                        className="icon-btn"
+                        title="Change Theme"
+                        style={{ color: theme === 'pink' ? 'var(--accent-primary)' : 'inherit' }}
+                    >
+                        <Palette size={20} />
+                    </button>
+                    <button onClick={logout} className="icon-btn" title="Logout">
+                        <LogOut size={20} />
+                    </button>
+                </div>
             </div>
 
             <div className="sidebar-tabs">
