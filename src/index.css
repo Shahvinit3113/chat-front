@@ -456,6 +456,7 @@ body {
   font-weight: 700;
   margin-bottom: 0.75rem;
   background: var(--accent-gradient);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1190,6 +1191,7 @@ body {
 
 .theme-pink .premium-empty-state .empty-state-title {
   background: linear-gradient(135deg, #ff8fa3, #ff4d6d);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
